@@ -23,6 +23,7 @@ use crate::{
     Context,
 };
 use ark_std::{end_timer, perf_trace::TimerInfo, start_timer};
+use halo2_proofs::plonk::JitProverEnv;
 use rand::{rngs::StdRng, SeedableRng};
 
 use super::fs::gen_srs;
@@ -32,8 +33,9 @@ use super::fs::gen_srs;
 pub fn gen_proof_with_instances(
     params: &ParamsKZG<Bn256>,
     pk: &ProvingKey<G1Affine>,
-    circuit: impl Circuit<Fr>,
+    circuit: impl Circuit<Fr> + Clone + Send + Sync + 'static,
     instances: &[&[Fr]],
+    env_info: &mut Option<JitProverEnv>,
 ) -> Vec<u8> {
     let rng = StdRng::seed_from_u64(0);
     let mut transcript = Blake2bWrite::<_, _, Challenge255<_>>::init(vec![]);
@@ -44,7 +46,7 @@ pub fn gen_proof_with_instances(
         _,
         Blake2bWrite<Vec<u8>, G1Affine, _>,
         _,
-    >(params, pk, &[circuit], &[instances], rng, &mut transcript)
+    >(params, pk, &[circuit], &[instances], rng, &mut transcript, env_info)
     .expect("prover should not fail");
     transcript.finalize()
 }
@@ -54,9 +56,10 @@ pub fn gen_proof_with_instances(
 pub fn gen_proof(
     params: &ParamsKZG<Bn256>,
     pk: &ProvingKey<G1Affine>,
-    circuit: impl Circuit<Fr>,
+    circuit: impl Circuit<Fr> + Clone + Send + Sync + 'static,
+    env_info: &mut Option<JitProverEnv>,
 ) -> Vec<u8> {
-    gen_proof_with_instances(params, pk, circuit, &[])
+    gen_proof_with_instances(params, pk, circuit, &[], env_info)
 }
 
 /// Helper function to verify a proof (generated using [`gen_proof_with_instances`]) using SHPLONK KZG multi-open polynomical commitment scheme
@@ -234,7 +237,7 @@ impl BaseTester {
         let mut builder = RangeCircuitBuilder::prover(config_params.clone(), break_points);
         let range = RangeChip::new(self.lookup_bits.unwrap_or(0), builder.lookup_manager().clone());
         f(builder.pool(0), &range, logic_input);
-        let proof = gen_proof(&params, &pk, builder);
+        let proof = gen_proof(&params, &pk, builder, &mut None);
         end_timer!(proof_time);
 
         let proof_size = proof.len();

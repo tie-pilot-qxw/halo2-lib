@@ -56,6 +56,10 @@ pub struct BaseCircuitBuilder<F: ScalarField> {
     pub assigned_instances: Vec<Vec<AssignedValue<F>>>,
 }
 
+// Safety: not safe at all, but we don't use this actually
+unsafe impl<F: ScalarField> Send for BaseCircuitBuilder<F> {}
+unsafe impl<F: ScalarField> Sync for BaseCircuitBuilder<F> {}
+
 impl<F: ScalarField> Default for BaseCircuitBuilder<F> {
     /// Quick start default circuit builder which can be used for MockProver, Keygen, and real prover.
     /// For best performance during real proof generation, we recommend using [BaseCircuitBuilder::prover] instead.
